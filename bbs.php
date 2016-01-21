@@ -1,10 +1,12 @@
 <?php
 
+  // $ispost = false;
   //ステップ１　DB接続
   $dsn      = 'mysql:dbname=oneline_bbs;host=localhost';
   //接続するためのユーザー情報
   $user     = 'root';
   $password = '';
+  $ispost = false;
 
   try {
     //DB接続オブジェクトを作成
@@ -12,28 +14,54 @@
     $dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     $dbh->query('SET NAMES utf8');
 
+    //GET送信が行われたら、編集処理を実行
+    if (isset($_GET['action']) && ($_GET['action'] == 'edit')) {
+      //編集したいデータを取得するSQL文を作成
+      $id = $_GET['id'];
+      $sql  = 'SELECT * FROM `posts` WHERE `id`='.$id;
+      //SQL文を実行
+      $stmt = $dbh->prepare($sql);
+      $stmt->execute();
+
+      $rec2 = $stmt->fetch(PDO::FETCH_ASSOC);  //1レコード取り出し
+      $ispost = true;
+      $nickname = $rec2['nickname'];
+      $comment  = $rec2['comment'];
+      $created  = new DateTime();
+      $created->setTimeZone(new DateTimeZone('+08:00'));
+
+    }
+
     if(isset($_POST) && !empty($_POST)){
       //SQL文作成(INSERT文)
       $nickname = htmlspecialchars($_POST['nickname']);
       $comment  = htmlspecialchars($_POST['comment']);
       $created  = new DateTime();
       $created->setTimeZone(new DateTimeZone('+08:00'));
-
+      // var_dump($isedit);
+      // var_dump($ispost);
+      // var_dump($id);
+    if ($_POST['id']) {
+      $sql  = 'UPDATE `posts` SET `id`='.$_POST['id'].',`nickname`="'.$nickname.'",`comment`="'.$comment.'",`created`="'.$created->format('Y-m-d H:i:s').
+      '" WHERE `id`='.$_POST['id'];
+    } else {
       $sql  = 'INSERT INTO `posts` (`nickname`,`comment`,`created`) 
                VALUES ("'.$nickname.'","'.$comment.'","'.$created->format('Y-m-d H:i:s').'")';
-
+    }
       //INSERT文実行
+    // var_dump($sql);
       $stmt = $dbh->prepare($sql);
       $stmt->execute();
     }
 
     //SQL文作成(SELECT文)
     $sql  = 'SELECT * FROM `posts` WHERE 1 ORDER BY `id` DESC';
+    
     //SELECT文実行
     $stmt = $dbh->prepare($sql);
     $stmt->execute();
 
-    echo '<table border=1>';
+    $posts = array();
 
     while (1) {
       $rec = $stmt->fetch(PDO::FETCH_ASSOC);  //1レコード取り出し
@@ -69,6 +97,7 @@
   <link rel="stylesheet" href="assets/css/main.css">
 
 </head>
+
 <body>
     <nav class="navbar navbar-default navbar-fixed-top">
       <div class="container">
@@ -97,6 +126,30 @@
     <div class="row">
       <div class="col-md-4 content-margin-top">
         <form action="bbs.php" method="post">
+          <?php if ($ispost) {?>
+
+          <div class="form-group">
+            <div class="input-group">
+              <input type="text" name="nickname" class="form-control"
+                       id="validate-text" placeholder="<?php echo $rec2['nickname'] ?>" required>
+
+              <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
+            </div>
+            
+          </div>
+
+          <div class="form-group">
+            <div class="input-group" data-validate="length" data-length="4">
+              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="<?php echo $rec2['comment'] ?>" required></textarea>
+              <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
+            </div>
+          </div>
+          <input type="hidden" name="id" value="<?php echo $rec2['id'] ?>">
+      <!-- 
+          <button type="submit" class="btn btn-primary col-xs-12" disabled>編集</button> -->
+
+          <button type="submit" class="btn btn-primary col-xs-12">編集</button>
+            <?php } else { ?> 
           <div class="form-group">
             <div class="input-group">
               <input type="text" name="nickname" class="form-control"
@@ -113,8 +166,14 @@
               <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
             </div>
           </div>
-      
-          <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button>
+      <!-- 
+          <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button> -->
+
+          <button type="submit" class="btn btn-primary col-xs-12">つぶやく</button>
+
+          <?php
+           }
+          ?>
         </form>
       </div>
 
@@ -122,19 +181,31 @@
 
         <div class="timeline-centered">
 
+        <?php
+        foreach ($posts as $post) { ?>
 
         <article class="timeline-entry">
 
             <div class="timeline-entry-inner">
-
+              <a href="bbs.php?action=edit&id=<?php echo $post['id'];?>">
                 <div class="timeline-icon bg-success">
                     <i class="entypo-feather"></i>
                     <i class="fa fa-cogs"></i>
                 </div>
+              </a>
+
+              <div class="timeline-label">
+                    <h2><a href="#"><?php echo $post['nickname'];?></a> <span><?php echo $post['created'];?></span></h2>
+                    <p><?php echo $post['comment'];?></p>
+              </div>
 
             </div>
 
         </article>
+
+          <?php
+           }
+          ?>
 
         <article class="timeline-entry begin">
 
@@ -152,20 +223,7 @@
 
     </div>
   </div>
-<!--     <form action="bbs.php" method="post">
-      <input type="text" name="nickname" placeholder="nickname" required>
-      <textarea type="text" name="comment" placeholder="comment" required></textarea>
-      <button type="submit" >つぶやく</button>
-    </form> -->
 
-
-<?php
-foreach ($posts as $post) { ?>
-    <h2><a href="#"><?php echo $post['nickname'];?></a> <span><?php echo $post['created'];?></span></h2>
-    <p><?php echo $post['comment'];?></p>
-<?php
-}
-?>
 
   <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
