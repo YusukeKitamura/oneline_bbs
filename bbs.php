@@ -7,7 +7,11 @@
   $password = '';
 
   //編集機能実行中フラグ
-  $ispost = false;
+  $mode = 'normal';
+  $editname='';
+  $editcomment = '';
+  $editpass = '';
+  $editid = '';
 
   try {
     //DB接続オブジェクトを作成
@@ -16,32 +20,25 @@
     $dbh->query('SET NAMES utf8');
 
     //GET送信が行われたら、編集処理を実行
-    if (isset($_GET['action']) && ($_GET['action'] == 'edit')) {
+    if (isset($_GET['action'])) {
       //編集したいデータを取得するSQL文を作成
       $id = $_GET['id'];
       $sql  = 'SELECT * FROM `posts` WHERE `id`='.$id;
       //SQL文を実行
       $stmt = $dbh->prepare($sql);
       $stmt->execute();
+      $rec = $stmt->fetch(PDO::FETCH_ASSOC);  //1レコード取り出し
+      $editid       = $rec['id'];
+      $editname     = $rec['nickname'];
+      $editcomment  = $rec['comment'];
+      $editpass     = $rec['password'];
 
-      $rec2 = $stmt->fetch(PDO::FETCH_ASSOC);  //1レコード取り出し
-      $ispost = true;
-      $nickname = $rec2['nickname'];
-      $comment  = $rec2['comment'];
-      $created  = new DateTime();
-      $created->setTimeZone(new DateTimeZone('+08:00'));
+      if ($_GET['action'] == 'edit') {
+        $mode = 'update';
+      } elseif ($_GET['action'] == 'delete') {
+        $mode = 'delete';
+      }
     }
-
-    if (isset($_GET['action']) && ($_GET['action'] == 'delete')) {
-      //編集したいデータを取得するSQL文を作成
-      $id = $_GET['id'];
-      $sql  = 'DELETE FROM `posts` WHERE `id`='.$id;
-      //SQL文を実行
-      $stmt = $dbh->prepare($sql);
-      $stmt->execute();
-    }
-
-    $id = '';
 
     if(isset($_POST) && !empty($_POST)){
       //SQL文作成(INSERT文)
@@ -49,18 +46,28 @@
       $comment  = htmlspecialchars($_POST['comment']);
       $created  = new DateTime();
       $created->setTimeZone(new DateTimeZone('+08:00'));
+      $password  = htmlspecialchars($_POST['password']);
       $id = $_POST['id'];
+      $origpass = $_POST['origpass'];
+      $sql = '';
 
-      if ($id) {
+      if ((isset($_POST['update'])) && $origpass==$password) {
         $sql  = 'UPDATE `posts` SET `id`='.$_POST['id'].',`nickname`="'.$nickname.'",`comment`="'.$comment.'",`created`="'.$created->format('Y-m-d H:i:s').
-        '" WHERE `id`='.$_POST['id'];
-      } else {
-        $sql  = 'INSERT INTO `posts` (`nickname`,`comment`,`created`) 
-                 VALUES ("'.$nickname.'","'.$comment.'","'.$created->format('Y-m-d H:i:s').'")';
+          '",`password`="'.$password.'" WHERE `id`='.$_POST['id'];
+      } elseif (isset($_POST['delete']) && $origpass==$password) {
+        $sql  = 'DELETE FROM `posts` WHERE `id`='.$id;
+      } elseif (isset($_POST['insert'])) {
+        $sql  = 'INSERT INTO `posts` (`nickname`,`comment`,`created`,`password`) 
+                 VALUES ("'.$nickname.'","'.$comment.'","'.$created->format('Y-m-d H:i:s').'","'.$password.'")';
       }
+      
       //INSERT文実行
-      $stmt = $dbh->prepare($sql);
-      $stmt->execute();
+      if ($sql=='') {
+        echo 'パスワードが間違っています';
+      } else {
+        $stmt = $dbh->prepare($sql);
+        $stmt->execute();
+      }
     }
 
     //SQL文作成(SELECT文)
@@ -132,57 +139,53 @@
     <div class="row">
       <div class="col-md-4 content-margin-top">
         <form action="bbs.php" method="post">
-          <?php if ($ispost) {?>
 
           <div class="form-group">
             <div class="input-group">
               <input type="text" name="nickname" class="form-control"
-                       id="validate-text" value="<?php echo $rec2['nickname'] ?>" required>
-
+                       id="validate-text" placeholder="nickname" value="<?php echo $editname; ?>" required>
               <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
             </div>
           </div>
 
           <div class="form-group">
             <div class="input-group" data-validate="length" data-length="4">
-              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="comment" required>
-                <?php echo $rec2['comment'] ?>
-              </textarea>
+              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="comment" required><?php echo $editcomment ?></textarea>
               <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
             </div>
           </div>
-          <input type="hidden" name="id" value="<?php echo $rec2['id'] ?>">
-      <!-- 
-          <button type="submit" class="btn btn-primary col-xs-12" disabled>編集</button> -->
-          <button type="submit" class="btn btn-primary col-xs-12" disabled>編集</button>
+
+          <div class="form-group">
+            <div class="input-group">
+              <input type="password" name="password" class="form-control"
+                       id="validate-text" placeholder="password" required>
+              <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
+            </div>
+          </div>
+          
+          <input type="hidden" name="id" value="<?php echo $editid ?>">
+          <input type="hidden" name="origpass" value="<?php echo $editpass ?>">
+
+          <?php if ($mode=='update') {?>
+
+          <button type="submit" name="update" class="btn btn-primary col-xs-12" disabled>編集</button>
+
+          <?php 
+          } elseif ($mode=='delete') {
+           ?>
+
+          <button type="submit" name="delete" class="btn btn-primary col-xs-12" disabled>削除</button>
 
           <?php 
           } else {
            ?> 
 
-          <div class="form-group">
-            <div class="input-group">
-              <input type="text" name="nickname" class="form-control"
-                       id="validate-text" placeholder="nickname" required>
-
-              <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
-            </div>
-            
-          </div>
-
-          <div class="form-group">
-            <div class="input-group" data-validate="length" data-length="4">
-              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="comment" required></textarea>
-              <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
-            </div>
-          </div>
-      <!-- 
-          <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button> -->
-          <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button>
+          <button type="submit" name="insert" class="btn btn-primary col-xs-12" disabled>つぶやく</button>
 
           <?php
            }
           ?>
+
         </form>
       </div>
 
@@ -215,6 +218,7 @@
                   <i class="fa fa-trash"></i>
                 </div>
               </a>
+
             </div>
 
         </article>
