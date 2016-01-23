@@ -1,16 +1,17 @@
 <?php
 
-  // $ispost = false;
   //ステップ１　DB接続
   $dsn      = 'mysql:dbname=oneline_bbs;host=localhost';
   //接続するためのユーザー情報
   $user     = 'root';
   $password = '';
+
+  //編集機能実行中フラグ
   $ispost = false;
 
   try {
     //DB接続オブジェクトを作成
-    $dbh      = new PDO($dsn, $user, $password);
+    $dbh  = new PDO($dsn, $user, $password);
     $dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     $dbh->query('SET NAMES utf8');
 
@@ -29,8 +30,18 @@
       $comment  = $rec2['comment'];
       $created  = new DateTime();
       $created->setTimeZone(new DateTimeZone('+08:00'));
-
     }
+
+    if (isset($_GET['action']) && ($_GET['action'] == 'delete')) {
+      //編集したいデータを取得するSQL文を作成
+      $id = $_GET['id'];
+      $sql  = 'DELETE FROM `posts` WHERE `id`='.$id;
+      //SQL文を実行
+      $stmt = $dbh->prepare($sql);
+      $stmt->execute();
+    }
+
+    $id = '';
 
     if(isset($_POST) && !empty($_POST)){
       //SQL文作成(INSERT文)
@@ -38,24 +49,22 @@
       $comment  = htmlspecialchars($_POST['comment']);
       $created  = new DateTime();
       $created->setTimeZone(new DateTimeZone('+08:00'));
-      // var_dump($isedit);
-      // var_dump($ispost);
-      // var_dump($id);
-    if ($_POST['id']) {
-      $sql  = 'UPDATE `posts` SET `id`='.$_POST['id'].',`nickname`="'.$nickname.'",`comment`="'.$comment.'",`created`="'.$created->format('Y-m-d H:i:s').
-      '" WHERE `id`='.$_POST['id'];
-    } else {
-      $sql  = 'INSERT INTO `posts` (`nickname`,`comment`,`created`) 
-               VALUES ("'.$nickname.'","'.$comment.'","'.$created->format('Y-m-d H:i:s').'")';
-    }
+      $id = $_POST['id'];
+
+      if ($id) {
+        $sql  = 'UPDATE `posts` SET `id`='.$_POST['id'].',`nickname`="'.$nickname.'",`comment`="'.$comment.'",`created`="'.$created->format('Y-m-d H:i:s').
+        '" WHERE `id`='.$_POST['id'];
+      } else {
+        $sql  = 'INSERT INTO `posts` (`nickname`,`comment`,`created`) 
+                 VALUES ("'.$nickname.'","'.$comment.'","'.$created->format('Y-m-d H:i:s').'")';
+      }
       //INSERT文実行
-    // var_dump($sql);
       $stmt = $dbh->prepare($sql);
       $stmt->execute();
     }
 
     //SQL文作成(SELECT文)
-    $sql  = 'SELECT * FROM `posts` WHERE 1 ORDER BY `id` DESC';
+    $sql  = 'SELECT * FROM `posts` WHERE 1 ORDER BY `created` DESC';
     
     //SELECT文実行
     $stmt = $dbh->prepare($sql);
@@ -65,19 +74,18 @@
 
     while (1) {
       $rec = $stmt->fetch(PDO::FETCH_ASSOC);  //1レコード取り出し
-      // var_dump($rec);
       if ($rec==false) {
         break;
       }
 
-      $posts[]=$rec;
+      $posts[] = $rec;
     }
 
     //データベースから切断
     $dbh = null;
 
   } catch (Exception $e) {
-    echo 'ただいま障害により大変ご迷惑を被っております。';
+    echo 'ただいま障害により大変ご迷惑をおかけしております。';
     echo $e;
   }
 
@@ -95,11 +103,10 @@
   <link rel="stylesheet" href="assets/css/form.css">
   <link rel="stylesheet" href="assets/css/timeline.css">
   <link rel="stylesheet" href="assets/css/main.css">
-
 </head>
 
 <body>
-    <nav class="navbar navbar-default navbar-fixed-top">
+  <nav class="navbar navbar-default navbar-fixed-top">
       <div class="container">
           <!-- Brand and toggle get grouped for better mobile display -->
           <div class="navbar-header page-scroll">
@@ -109,13 +116,12 @@
                   <span class="icon-bar"></span>
                   <span class="icon-bar"></span>
               </button>
-              <a class="navbar-brand" href="#page-top"><span class="strong-title"><i class="fa fa-linux"></i> Oneline bbs</span></a>
+              <a class="navbar-brand" href="#page-top"><span class="strong-title"><i class="fa fa-windows"></i> Oneline bbs</span></a>
           </div>
           <!-- Collect the nav links, forms, and other content for toggling -->
           <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-              <ul class="nav navbar-nav navbar-right">
-
-              </ul>
+            <ul class="nav navbar-nav navbar-right">
+            </ul>
           </div>
           <!-- /.navbar-collapse -->
       </div>
@@ -131,25 +137,29 @@
           <div class="form-group">
             <div class="input-group">
               <input type="text" name="nickname" class="form-control"
-                       id="validate-text" placeholder="<?php echo $rec2['nickname'] ?>" required>
+                       id="validate-text" value="<?php echo $rec2['nickname'] ?>" required>
 
               <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
             </div>
-            
           </div>
 
           <div class="form-group">
             <div class="input-group" data-validate="length" data-length="4">
-              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="<?php echo $rec2['comment'] ?>" required></textarea>
+              <textarea type="text" class="form-control" name="comment" id="validate-length" placeholder="comment" required>
+                <?php echo $rec2['comment'] ?>
+              </textarea>
               <span class="input-group-addon danger"><span class="glyphicon glyphicon-remove"></span></span>
             </div>
           </div>
           <input type="hidden" name="id" value="<?php echo $rec2['id'] ?>">
       <!-- 
           <button type="submit" class="btn btn-primary col-xs-12" disabled>編集</button> -->
+          <button type="submit" class="btn btn-primary col-xs-12" disabled>編集</button>
 
-          <button type="submit" class="btn btn-primary col-xs-12">編集</button>
-            <?php } else { ?> 
+          <?php 
+          } else {
+           ?> 
+
           <div class="form-group">
             <div class="input-group">
               <input type="text" name="nickname" class="form-control"
@@ -168,8 +178,7 @@
           </div>
       <!-- 
           <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button> -->
-
-          <button type="submit" class="btn btn-primary col-xs-12">つぶやく</button>
+          <button type="submit" class="btn btn-primary col-xs-12" disabled>つぶやく</button>
 
           <?php
            }
@@ -182,7 +191,8 @@
         <div class="timeline-centered">
 
         <?php
-        foreach ($posts as $post) { ?>
+        foreach ($posts as $post) {
+         ?>
 
         <article class="timeline-entry">
 
@@ -195,10 +205,16 @@
               </a>
 
               <div class="timeline-label">
-                    <h2><a href="#"><?php echo $post['nickname'];?></a> <span><?php echo $post['created'];?></span></h2>
-                    <p><?php echo $post['comment'];?></p>
+                <h2><a href="#"><?php echo $post['nickname'];?></a> <span><?php echo $post['created'];?></span></h2>
+                <p><?php echo $post['comment'];?></p>
               </div>
 
+              <a href="bbs.php?action=delete&id=<?php echo $post['id'];?>">
+                <div class="timeline-icon bg-success">
+                  <i class="entypo-feather"></i>
+                  <i class="fa fa-trash"></i>
+                </div>
+              </a>
             </div>
 
         </article>
@@ -208,15 +224,11 @@
           ?>
 
         <article class="timeline-entry begin">
-
-            <div class="timeline-entry-inner">
-
-                <div class="timeline-icon" style="-webkit-transform: rotate(-90deg); -moz-transform: rotate(-90deg);">
-                    <i class="entypo-flight"></i> +
-                </div>
-
+          <div class="timeline-entry-inner">
+            <div class="timeline-icon" style="-webkit-transform: rotate(-90deg); -moz-transform: rotate(-90deg);">
+              <i class="entypo-flight"></i> +
             </div>
-
+          </div>
         </article>
 
       </div>
